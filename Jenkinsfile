@@ -64,7 +64,7 @@ pipeline {
         stage("Trigger Infra Deployment") {
             steps {
                 // Trigger separate infra deployment pipeline
-                build job: 'infra-deploy-pipeline',
+                build job: 'infra-pipeline',
                       parameters: [
                           string(name: 'COMMIT_ID', value: env.IMAGE_TAG)
                       ]
