@@ -9,7 +9,7 @@ env:
   AWS_REGION: us-east-1
   ECR_REPO: test-pipeline-repo
   AWS_ACCOUNT_ID: 756827365110
-  INFRA_REPO: your-org/infra   # CHANGE THIS
+  INFRA_REPO: infra-repo-env
 
 jobs:
   build-deploy:
