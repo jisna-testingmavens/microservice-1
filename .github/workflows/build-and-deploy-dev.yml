@@ -1,0 +1,66 @@
+name: Build & Deploy ms-1 to DEV
+
+on:
+  push:
+    branches:
+      - main
+
+env:
+  AWS_REGION: us-east-1
+  ECR_REPO: test-pipeline-repo
+  AWS_ACCOUNT_ID: 756827365110
+  INFRA_REPO: your-org/infra   # CHANGE THIS
+
+jobs:
+  build-deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout ms-1 code
+        uses: actions/checkout@v4
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v2
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Login to ECR
+        uses: aws-actions/amazon-ecr-login@v1
+
+      - name: Build & Push Docker Image
+        run: |
+          GIT_SHA=$(git rev-parse HEAD)
+
+          docker build -t $ECR_REPO:$GIT_SHA .
+          docker tag $ECR_REPO:$GIT_SHA \
+            $AWS_ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com/$ECR_REPO:$GIT_SHA
+
+          docker push \
+            $AWS_ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com/$ECR_REPO:$GIT_SHA
+
+          echo "IMAGE_TAG=$GIT_SHA" >> $GITHUB_ENV
+
+      # -------- GitOps step starts here --------
+
+      - name: Checkout infra repo
+        uses: actions/checkout@v4
+        with:
+          repository: ${{ env.INFRA_REPO }}
+          token: ${{ secrets.INFRA_GITHUB_TOKEN }}
+          path: infra
+
+      - name: Update DEV image tag in infra repo
+        run: |
+          cd infra
+          yq e '.image.tag = env(IMAGE_TAG)' -i envs/dev/ms-1-values.yaml
+
+      - name: Commit & Push infra change
+        run: |
+          cd infra
+          git config user.name "github-actions"
+          git config user.email "github-actions@github.com"
+          git add envs/dev/ms-1-values.yaml
+          git commit -m "ms-1(dev): deploy $IMAGE_TAG"
+          git push
